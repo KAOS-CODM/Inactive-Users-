@@ -13,6 +13,8 @@
     details { margin: 10px 0; border: 1px solid #444; border-radius: 5px; padding: 8px; background: #222; }
     summary { cursor: pointer; font-weight: bold; color: #ffcc00; }
     li { margin-bottom: 4px; }
+    a { color:#0af; text-decoration:none; }
+    a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -36,7 +38,8 @@
 
   async function fetchUser(id, key) {
     try {
-      let url = `https://cartelempire.online/api/user?id=${id}&type=advanced,status&key=${key}`;
+      // Using exact fields as per your docs: advanced, status, battleStats
+      let url = `https://cartelempire.online/api/user?id=${id}&type=advanced,status,battleStats&key=${key}`;
       let res = await fetch(url);
       if (!res.ok) throw new Error(res.status);
       return await res.json();
@@ -63,27 +66,42 @@
     debug("🚀 Starting inactive scan…");
 
     let inactive = [];
-    for (let i=1; i<=200; i++) { // example: scan user IDs 1–200
+    const startID = 1, endID = 200; // adjust range as needed
+
+    for (let i=startID; i<=endID; i++) {
       let u = await fetchUser(i, key);
       if (!u) continue;
-      if (u.status?.toLowerCase() === "inactive") {
+
+      // Detect inactive by status or lastActive > 30 days
+      const inactiveByStatus = u.status?.toLowerCase() === "inactive";
+      const inactiveByTime = u.lastActive && ((Date.now()/1000 - u.lastActive) > 30*24*3600);
+      if (inactiveByStatus || inactiveByTime) {
         inactive.push(u);
-        debug("Found inactive: " + u.name + " (Lvl " + u.level + ")");
+        debug(`Found inactive: ${u.name} (Lvl ${u.level})`);
       }
-      await new Promise(r=>setTimeout(r, 200)); // rate-limit
+
+      await new Promise(r => setTimeout(r, 200)); // rate-limit
     }
 
-    debug("✅ Scan complete. Found " + inactive.length + " inactive users.");
+    debug(`✅ Scan complete. Found ${inactive.length} inactive users.`);
 
     // group + render
     let grouped = groupByLevel(inactive);
     let results = document.querySelector("#results");
     results.innerHTML = "";
+
     for (let lvl in grouped) {
       let users = grouped[lvl];
       let details = document.createElement("details");
       details.innerHTML = `<summary>Level ${lvl} — ${users.length} users</summary>
-        <ul>${users.map(u=>`<li>${u.name} • Age ${u.age} • Cartel ${u.cartelName||"None"}</li>`).join("")}</ul>`;
+        <ul>
+        ${users.map(u => `<li>
+          <a href="https://cartelempire.online/Profile/${u.userId}" target="_blank">${u.name}</a> • 
+          Age: ${u.age || "N/A"} • 
+          Cartel: ${u.cartelName || "None"} • 
+          STR: ${u.strength || 0} • DEF: ${u.defence || 0} • AGI: ${u.agility || 0} • ACC: ${u.accuracy || 0} • INT: ${u.intelligence || 0}
+        </li>`).join("")}
+        </ul>`;
       results.appendChild(details);
     }
   });
