@@ -13,17 +13,16 @@
 </head>
 <body>
   <h1>Inactive User Tools</h1>
-  <p>This standalone page will scan Cartel Empire for inactive users. Make sure you are logged in on <a href="https://cartelempire.online" target="_blank">Cartel Empire</a> in the same browser.</p>
-  <button id="startBtn">🚀 Start Inactive Finder</button>
+  <p>Click the button to inject the scanner into <strong>Cartel Empire</strong>.  
+     Make sure you’re logged in there.</p>
+  <button id="injectBtn">🚀 Launch Inactive Finder</button>
   <div id="debugBox"></div>
 
   <script>
   (function() {
     'use strict';
-
-    // --- Debug overlay + console ---
     function logScreen(msg) {
-      console.log(msg); // console logging
+      console.log(msg);
       let box = document.querySelector("#debugBox");
       let line = document.createElement("div");
       line.textContent = msg;
@@ -31,173 +30,230 @@
       box.scrollTop = box.scrollHeight;
     }
 
-    const batchSize = 5;
-    const perRangeCap = 200;
+    document.getElementById("injectBtn").addEventListener("click", () => {
+      logScreen("Opening Cartel Empire and injecting script…");
 
-    // --- Helpers ---
-    function groupByStats(users) {
-      let groups = {"0–1000": [], "1001–5000": [], "5001–10000": [], "10000+": []};
-      users.forEach(u => {
-        let age = parseInt(u.age || "0");
-        if (age <= 1000) groups["0–1000"].push(u);
-        else if (age <= 5000) groups["1001–5000"].push(u);
-        else if (age <= 10000) groups["5001–10000"].push(u);
-        else groups["10000+"].push(u);
-      });
-      return groups;
-    }
+      // open CE in a new tab (user search page so cookies apply)
+      let w = window.open("https://cartelempire.online/Search/Users?q=&p=1", "_blank");
 
-    function groupByLevel(users) {
-      let map = {};
-      users.forEach(u => {
-        let lvl = parseInt(u.level || "0");
-        if (!map[lvl]) map[lvl] = [];
-        map[lvl].push(u);
-      });
-      let ordered = {};
-      Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(lvl=>{
-        ordered[lvl] = map[lvl];
-      });
-      return ordered;
-    }
+      // wait for the new tab to load, then inject our full script
+      let check = setInterval(() => {
+        try {
+          if (w.document && w.document.readyState === "complete") {
+            clearInterval(check);
 
-    async function parsePageText(t) {
-      let d = new DOMParser().parseFromString(t, "text/html");
-      let rows = d.querySelectorAll("#userTable tbody tr"), o = [];
-      logScreen("📄 Parsed page, rows=" + rows.length);
+            let s = w.document.createElement("script");
+            s.textContent = `(${inactiveScript.toString()})();`;
+            w.document.body.appendChild(s);
 
-      rows.forEach(r => {
-        let link = r.querySelector("th a.fw-bold");
-        let profile = link ? new URL(link.getAttribute("href"), location.origin).href : "#";
-        o.push({
-          name: link?.textContent.trim() || "",
-          profile,
-          level: r.querySelector("td:nth-of-type(2)")?.textContent.trim() || "",
-          age: r.querySelector("td:nth-of-type(3) span")?.textContent.trim() || "0",
-          cartel: r.querySelector("td:nth-of-type(4) a")?.textContent.trim() || "None",
-          status: r.querySelector("td:nth-of-type(5)")?.textContent.trim() || "",
-          activity: r.querySelector("th svg title")?.textContent.trim() || ""
-        });
-      });
-      return o;
-    }
-
-    async function fetchPage(p) {
-      try {
-        logScreen("🌐 Fetching page " + p);
-        let res = await fetch(`https://cartelempire.online/Search/Users?q=&p=${p}`, {credentials:"include"});
-        return await parsePageText(await res.text());
-      } catch(e) {
-        logScreen("❌ Fetch failed p" + p + ": " + e.message);
-        return [];
-      }
-    }
-
-    async function getMaxPages() {
-      try {
-        let res = await fetch(`https://cartelempire.online/Search/Users?q=&p=1`, { credentials: "include" });
-        let text = await res.text();
-        let d = new DOMParser().parseFromString(text, "text/html");
-        let pl = [...d.querySelectorAll(".pageNav a[data-page]")].map(a => parseInt(a.getAttribute("data-page")||"1"));
-        return pl.length ? Math.max(...pl) : 1;
-      } catch(e) {
-        logScreen("❌ Failed to get max pages: " + e.message);
-        return 1;
-      }
-    }
-
-    async function runInactiveFinder() {
-      logScreen("🚀 Multi-page inactive finder starting…");
-
-      let maxPage = await getMaxPages();
-      logScreen("📑 Max pages = " + maxPage);
-
-      let p = prompt(`There are ${maxPage} pages. How many to scan?`, maxPage.toString());
-      let pagesToScan = Math.max(1, Math.min(maxPage, parseInt(p) || maxPage));
-      logScreen("➡️ Will scan " + pagesToScan + " pages");
-
-      let w = window.open("about:blank", "_blank");
-      w.document.write(`<html><head>
-        <style>
-          body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 15px; }
-          details { margin: 10px 0; border: 1px solid #444; border-radius: 5px; padding: 8px; background: #222; }
-          summary { cursor: pointer; font-weight: bold; color: #ffcc00; }
-          ul { margin: 5px 0 0 20px; }
-          li { margin-bottom: 4px; }
-          .show-all { color: #4caf50; cursor: pointer; font-style: italic; margin-top: 6px; display: inline-block; }
-        </style>
-      </head><body><h1>Loading…</h1></body></html>`);
-      w.document.close();
-
-      let currentPage = 1, inactive = [];
-
-      async function processBatch() {
-        let promises = [];
-        for (let i=0; i<batchSize && currentPage<=pagesToScan; i++, currentPage++) {
-          promises.push(fetchPage(currentPage));
-        }
-        let results = (await Promise.all(promises)).flat();
-        let newlyInactive = results.filter(u=>(u.activity||"").toLowerCase().includes("inactive"));
-        inactive = inactive.concat(newlyInactive);
-
-        // enforce per-range cap
-        let groupedTmp = groupByStats(inactive);
-        inactive = Object.values(groupedTmp).flatMap(arr => arr.slice(0, perRangeCap));
-
-        logScreen(`📊 Batch done. Total inactive = ${inactive.length}`);
-
-        let grouped = groupByStats(inactive);
-
-        if (!w.document.querySelector("#inactive-container")) {
-          let html = `<div id="inactive-container">
-              <h1>Inactive Users — grouped</h1>
-              <p id="scan-status">Scanned: 0/${pagesToScan} • Found: 0</p>`;
-          for (const range of Object.keys(grouped)) {
-            let rangeId = range.replace(/\W/g,'');
-            html += `<details id="range-${rangeId}">
-              <summary>Stats ${range} — 0 inactive users</summary>
-              <div id="levelGroups-${rangeId}"></div>
-            </details>`;
+            logScreen("✅ Script injected inside Cartel Empire");
           }
-          html += `</div>`;
-          w.document.body.innerHTML = html;
+        } catch (e) {
+          // ignore cross-origin access errors until it loads
+        }
+      }, 1000);
+    });
+
+    // === FULL USERSCRIPT CODE DROPPED IN HERE ===
+    function inactiveScript() {
+      (function() {
+        'use strict';
+
+        // --- Debug overlay ---
+        function logScreen(msg) {
+          let box = document.querySelector("#debugBox");
+          if (!box) {
+            box = document.createElement("div");
+            box.id = "debugBox";
+            box.style.cssText = `
+              position:fixed;bottom:0;left:0;right:0;
+              background:#111;color:#0f0;
+              padding:6px;font-size:12px;
+              z-index:99999;max-height:150px;overflow:auto;
+              font-family:monospace;
+            `;
+            document.body.appendChild(box);
+          }
+          let line = document.createElement("div");
+          line.textContent = msg;
+          box.appendChild(line);
         }
 
-        w.document.querySelector("#scan-status").textContent =
-          `Scanned: ${currentPage-1}/${pagesToScan} • Found: ${inactive.length}`;
+        logScreen("✅ Inactive User Tools script injected: " + location.href);
 
-        for (const range of Object.keys(grouped)) {
-          let users = grouped[range];
-          let rangeId = range.replace(/\W/g,'');
-          let rangeDetails = w.document.querySelector(`#range-${rangeId}`);
-          if (!rangeDetails) continue;
+        const batchSize = 5;
+        const perRangeCap = 200;
 
-          let summary = rangeDetails.querySelector("summary");
-          summary.textContent = `Stats ${range} — ${users.length} inactive users`;
+        function groupByStats(users) {
+          let groups = {"0–1000": [], "1001–5000": [], "5001–10000": [], "10000+": []};
+          users.forEach(u => {
+            let age = parseInt(u.age || "0");
+            if (age <= 1000) groups["0–1000"].push(u);
+            else if (age <= 5000) groups["1001–5000"].push(u);
+            else if (age <= 10000) groups["5001–10000"].push(u);
+            else groups["10000+"].push(u);
+          });
+          return groups;
+        }
 
-          let levelsContainer = rangeDetails.querySelector(`#levelGroups-${rangeId}`);
-          levelsContainer.innerHTML = "";
-          let byLevel = groupByLevel(users);
+        function groupByLevel(users) {
+          let map = {};
+          users.forEach(u => {
+            let lvl = parseInt(u.level || "0");
+            if (!map[lvl]) map[lvl] = [];
+            map[lvl].push(u);
+          });
+          let ordered = {};
+          Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(lvl=>{
+            ordered[lvl] = map[lvl];
+          });
+          return ordered;
+        }
 
-          for (const lvl of Object.keys(byLevel)) {
-            let arr = byLevel[lvl];
-            let levelId = `${rangeId}-lvl${lvl}`;
+        async function parsePageText(t) {
+          let d = new DOMParser().parseFromString(t, "text/html");
+          let rows = d.querySelectorAll("#userTable tbody tr"), o = [];
+          logScreen("📄 Parsed page, rows=" + rows.length);
 
-            let details = document.createElement("details");
-            details.id = levelId;
-            details.innerHTML = `<summary>Level ${lvl} — ${arr.length} users</summary>
-              <ul>${arr.slice(0,30).map(u=>`<li><a href="${u.profile}" target="_blank">${u.name}</a> • Age ${u.age} • Cartel: ${u.cartel} • ${u.status}</li>`).join("")}</ul>`;
-            levelsContainer.appendChild(details);
+          rows.forEach(r => {
+            let link = r.querySelector("th a.fw-bold");
+            let profile = link ? new URL(link.getAttribute("href"), location.origin).href : "#";
+            o.push({
+              name: link?.textContent.trim() || "",
+              profile,
+              level: r.querySelector("td:nth-of-type(2)")?.textContent.trim() || "",
+              age: r.querySelector("td:nth-of-type(3) span")?.textContent.trim() || "0",
+              cartel: r.querySelector("td:nth-of-type(4) a")?.textContent.trim() || "None",
+              status: r.querySelector("td:nth-of-type(5)")?.textContent.trim() || "",
+              activity: r.querySelector("th svg title")?.textContent.trim() || ""
+            });
+          });
+          return o;
+        }
+
+        async function fetchPage(p) {
+          try {
+            logScreen("🌐 Fetching page " + p);
+            let res = await fetch(`/Search/Users?q=&p=${p}`, {credentials:"include"});
+            return await parsePageText(await res.text());
+          } catch(e) {
+            logScreen("❌ Fetch failed p" + p + ": " + e.message);
+            return [];
           }
         }
 
-        if (currentPage<=pagesToScan) setTimeout(processBatch, 500);
-      }
+        async function getMaxPages() {
+          try {
+            let res = await fetch(`/Search/Users?q=&p=1`, { credentials: "include" });
+            let text = await res.text();
+            let d = new DOMParser().parseFromString(text, "text/html");
+            let pl = [...d.querySelectorAll(".pageNav a[data-page]`)].map(a => parseInt(a.getAttribute("data-page")||"1"));
+            return pl.length ? Math.max(...pl) : 1;
+          } catch(e) {
+            logScreen("❌ Failed to get max pages: " + e.message);
+            return 1;
+          }
+        }
 
-      processBatch();
+        async function runInactiveFinder() {
+          logScreen("🚀 Multi-page inactive finder starting…");
+
+          let maxPage = await getMaxPages();
+          logScreen("📑 Max pages = " + maxPage);
+
+          let p = prompt(`There are ${maxPage} pages. How many to scan?`, maxPage.toString());
+          let pagesToScan = Math.max(1, Math.min(maxPage, parseInt(p) || maxPage));
+          logScreen("➡️ Will scan " + pagesToScan + " pages");
+
+          let w = window.open("about:blank", "_blank");
+          w.document.write(`<html><head>
+            <style>
+              body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 15px; }
+              details { margin: 10px 0; border: 1px solid #444; border-radius: 5px; padding: 8px; background: #222; }
+              summary { cursor: pointer; font-weight: bold; color: #ffcc00; }
+              ul { margin: 5px 0 0 20px; }
+              li { margin-bottom: 4px; }
+              .show-all { color: #4caf50; cursor: pointer; font-style: italic; margin-top: 6px; display: inline-block; }
+            </style>
+          </head><body><h1>Loading…</h1></body></html>`);
+          w.document.close();
+
+          let currentPage = 1, inactive = [];
+
+          async function processBatch() {
+            let promises = [];
+            for (let i=0; i<batchSize && currentPage<=pagesToScan; i++, currentPage++) {
+              promises.push(fetchPage(currentPage));
+            }
+            let results = (await Promise.all(promises)).flat();
+            let newlyInactive = results.filter(u=>(u.activity||"").toLowerCase().includes("inactive"));
+            inactive = inactive.concat(newlyInactive);
+
+            let groupedTmp = groupByStats(inactive);
+            inactive = Object.values(groupedTmp).flatMap(arr => arr.slice(0, perRangeCap));
+
+            logScreen(`📊 Batch done. Total inactive = ${inactive.length}`);
+
+            let grouped = groupByStats(inactive);
+
+            if (!w.document.querySelector("#inactive-container")) {
+              let html = `<div id="inactive-container">
+                  <h1>Inactive Users — grouped</h1>
+                  <p id="scan-status">Scanned: 0/${pagesToScan} • Found: 0</p>`;
+              for (const range of Object.keys(grouped)) {
+                let rangeId = range.replace(/\W/g,'');
+                html += `<details id="range-${rangeId}">
+                  <summary>Stats ${range} — 0 inactive users</summary>
+                  <div id="levelGroups-${rangeId}"></div>
+                </details>`;
+              }
+              html += `</div>`;
+              w.document.body.innerHTML = html;
+            }
+
+            w.document.querySelector("#scan-status").textContent =
+              `Scanned: ${currentPage-1}/${pagesToScan} • Found: ${inactive.length}`;
+
+            for (const range of Object.keys(grouped)) {
+              let users = grouped[range];
+              let rangeId = range.replace(/\W/g,'');
+              let rangeDetails = w.document.querySelector(`#range-${rangeId}`);
+              if (!rangeDetails) continue;
+
+              let summary = rangeDetails.querySelector("summary");
+              summary.textContent = `Stats ${range} — ${users.length} inactive users`;
+
+              let levelsContainer = rangeDetails.querySelector(`#levelGroups-${rangeId}`);
+              levelsContainer.innerHTML = "";
+              let byLevel = groupByLevel(users);
+
+              for (const lvl of Object.keys(byLevel)) {
+                let arr = byLevel[lvl];
+                let levelId = `${rangeId}-lvl${lvl}`;
+
+                let details = document.createElement("details");
+                details.id = levelId;
+                details.innerHTML = `<summary>Level ${lvl} — ${arr.length} users</summary>
+                  <ul>${arr.slice(0,30).map(u=>`<li><a href="${u.profile}" target="_blank">${u.name}</a> • Age ${u.age} • Cartel: ${u.cartel} • ${u.status}</li>`).join("")}</ul>`;
+                levelsContainer.appendChild(details);
+              }
+            }
+
+            if (currentPage<=pagesToScan) setTimeout(processBatch, 500);
+          }
+
+          processBatch();
+        }
+
+        // Add button to CE page
+        const btn = document.createElement("button");
+        btn.textContent = "🚀 Start Inactive Finder";
+        btn.className = "btn btn-dark";
+        btn.onclick = runInactiveFinder;
+        document.body.insertBefore(btn, document.body.firstChild);
+
+      })();
     }
-
-    document.getElementById("startBtn").addEventListener("click", runInactiveFinder);
   })();
   </script>
 </body>
