@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Inactive User Tools — API Edition</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; padding:20px; }
+    h1 { color:#ffcc00; }
+    input, button { padding:8px; margin:6px 0; border-radius:6px; }
+    button { cursor:pointer; background:#ffcc00; border:none; font-weight:bold; }
+    #debugBox { margin-top:20px; font-family:monospace; font-size:12px; background:#000; color:#0f0; padding:6px; max-height:200px; overflow:auto; }
+    details { margin: 10px 0; border: 1px solid #444; border-radius: 5px; padding: 8px; background: #222; }
+    summary { cursor: pointer; font-weight: bold; color: #ffcc00; }
+    li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Inactive User Tools (API)</h1>
+  <p>Paste your Cartel Empire API key and scan users for inactivity.</p>
+  <input type="text" id="apiKey" placeholder="Enter your API key" style="width:100%" />
+  <button id="startBtn">🚀 Start Scan</button>
+  <div id="debugBox"></div>
+  <div id="results"></div>
+
+<script>
+(async function() {
+  const debug = msg => {
+    console.log(msg);
+    let box = document.querySelector("#debugBox");
+    let line = document.createElement("div");
+    line.textContent = msg;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  };
+
+  async function fetchUser(id, key) {
+    try {
+      let url = `https://cartelempire.online/api/user?id=${id}&type=advanced,status&key=${key}`;
+      let res = await fetch(url);
+      if (!res.ok) throw new Error(res.status);
+      return await res.json();
+    } catch(e) {
+      debug("❌ Fetch user " + id + " failed: " + e.message);
+      return null;
+    }
+  }
+
+  function groupByLevel(users) {
+    let map = {};
+    users.forEach(u => {
+      let lvl = u.level || 0;
+      if (!map[lvl]) map[lvl] = [];
+      map[lvl].push(u);
+    });
+    return Object.fromEntries(Object.entries(map).sort((a,b)=>a[0]-b[0]));
+  }
+
+  document.getElementById("startBtn").addEventListener("click", async () => {
+    let key = document.getElementById("apiKey").value.trim();
+    if (!key) return alert("Please enter your API key!");
+
+    debug("🚀 Starting inactive scan…");
+
+    let inactive = [];
+    for (let i=1; i<=200; i++) { // example: scan user IDs 1–200
+      let u = await fetchUser(i, key);
+      if (!u) continue;
+      if (u.status?.toLowerCase() === "inactive") {
+        inactive.push(u);
+        debug("Found inactive: " + u.name + " (Lvl " + u.level + ")");
+      }
+      await new Promise(r=>setTimeout(r, 200)); // rate-limit
+    }
+
+    debug("✅ Scan complete. Found " + inactive.length + " inactive users.");
+
+    // group + render
+    let grouped = groupByLevel(inactive);
+    let results = document.querySelector("#results");
+    results.innerHTML = "";
+    for (let lvl in grouped) {
+      let users = grouped[lvl];
+      let details = document.createElement("details");
+      details.innerHTML = `<summary>Level ${lvl} — ${users.length} users</summary>
+        <ul>${users.map(u=>`<li>${u.name} • Age ${u.age} • Cartel ${u.cartelName||"None"}</li>`).join("")}</ul>`;
+      results.appendChild(details);
+    }
+  });
+})();
+</script>
+</body>
+</html>
