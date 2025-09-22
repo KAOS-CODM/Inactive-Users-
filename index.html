@@ -21,8 +21,9 @@
   (function() {
     'use strict';
 
-    // --- Debug overlay ---
+    // --- Debug overlay + console ---
     function logScreen(msg) {
+      console.log(msg); // console logging
       let box = document.querySelector("#debugBox");
       let line = document.createElement("div");
       line.textContent = msg;
@@ -97,7 +98,7 @@
         let res = await fetch(`https://cartelempire.online/Search/Users?q=&p=1`, { credentials: "include" });
         let text = await res.text();
         let d = new DOMParser().parseFromString(text, "text/html");
-        let pl = [...d.querySelectorAll(".pageNav a[data-page]`)].map(a => parseInt(a.getAttribute("data-page")||"1"));
+        let pl = [...d.querySelectorAll(".pageNav a[data-page]")].map(a => parseInt(a.getAttribute("data-page")||"1"));
         return pl.length ? Math.max(...pl) : 1;
       } catch(e) {
         logScreen("❌ Failed to get max pages: " + e.message);
