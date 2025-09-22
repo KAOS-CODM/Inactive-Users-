@@ -2,24 +2,25 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Inactive Users Tool</title>
+  <title>Inactive User Tools</title>
+  <style>
+    body { margin:0; height:100vh; }
+    iframe { border:0; width:100%; height:100%; }
+  </style>
 </head>
-<body style="background:#111;color:#eee;font-family:monospace;padding:20px;">
-  <h1>Cartel Empire - Inactive User Tool</h1>
-  <p>Click below to launch the tool in Cartel Empire:</p>
-  <button id="launch" style="padding:10px 20px;background:#4caf50;color:#fff;border:none;border-radius:5px;cursor:pointer;">
-    Open Inactive Users Tool
-  </button>
-
+<body>
+  <iframe id="cartelFrame" src="https://cartelempire.online/Cartel"></iframe>
   <script>
-    document.getElementById("launch").addEventListener("click", function(){
-      var w = window.open("https://cartelempire.online/Cartel", "_blank");
-      var scriptUrl = "https://gist.githubusercontent.com/KAOS-CODM/5b9017246f869e3b0ccf5fa5ab55a641/raw/24b7776d40bc893c11a6133e8f51958b500c5175/inactive-users-v37.user.js";
-      w.onload = function() {
-        var s = w.document.createElement("script");
-        s.src = scriptUrl + "?_=" + Date.now(); // cache-bust
-        w.document.body.appendChild(s);
-      };
+    const frame = document.getElementById("cartelFrame");
+
+    frame.addEventListener("load", () => {
+      try {
+        const s = frame.contentDocument.createElement("script");
+        s.src = "https://gist.githubusercontent.com/KAOS-CODM/5b9017246f869e3b0ccf5fa5ab55a641/raw/inactive-users-v37.user.js?_=" + Date.now();
+        frame.contentDocument.body.appendChild(s);
+      } catch(e) {
+        alert("❌ Couldn’t inject script into iframe — site may block framing (X-Frame-Options/CSP).");
+      }
     });
   </script>
 </body>
