@@ -1,120 +1,26 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cartel Empire — Inactive Users Installer</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0f1114;color:#e6eef6;padding:20px}
-    .card{background:#131417;border:1px solid #2a2f33;padding:18px;border-radius:10px;max-width:820px;margin:18px auto}
-    h1{color:#ffd24d;margin:0 0 10px}
-    p{color:#d7e1ea;line-height:1.4}
-    a.bookmarklet{display:inline-block;background:#ffd24d;color:#111;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0}
-    button, .copy-btn{appearance:none;border:0;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:600}
-    .copy-btn{background:#2b7a78;color:#fff}
-    .run-btn{background:#3b82f6;color:#fff}
-    pre{background:#0b0d0f;padding:10px;border-radius:6px;overflow:auto;color:#cfe8ff}
-    .hint{font-size:13px;color:#9fb0c7;margin-top:8px}
-    .ok{color:#4caf50}
-    .danger{color:#ff6b6b}
-    footer{font-size:13px;color:#9fb0c7;margin-top:12px}
-  </style>
+  <meta charset="utf-8">
+  <title>Inactive Users Tool</title>
 </head>
-<body>
-  <div class="card">
-    <h1>Cartel Empire — Inactive Users Installer</h1>
-    <p>Use this page to install the <strong>inactive users</strong> bookmarklet for your browser or copy it for mobile installs.</p>
-
-    <h3>1) Drag to bookmarks (desktop)</h3>
-    <p>Drag the yellow button to your browser bookmarks bar (works in desktop Chrome/Firefox/Edge/Safari).</p>
-    <!-- Bookmarklet link (drag to bookmarks bar) -->
-    <a class="bookmarklet" id="dragLink"
-      href="javascript:(function(){var s=document.createElement('script');s.src='https://gist.githubusercontent.com/KAOS-CODM/5b9017246f869e3b0ccf5fa5ab55a641/raw/24b7776d40bc893c11a6133e8f51958b500c5175/inactive-users-v37.user.js?'+Date.now();document.body.appendChild(s);})();void(0);">
-      Drag to bookmarks bar
-    </a>
-
-    <h3>2) Copy bookmarklet (mobile & desktop)</h3>
-    <p>Tap <strong>Copy bookmarklet</strong>, then create a bookmark and replace the bookmark URL with the copied text.</p>
-    <p>
-      <button class="copy-btn" id="copyBtn">Copy bookmarklet</button>
-      &nbsp;
-      <button class="run-btn" id="runBtn">Run now (current tab)</button>
-    </p>
-    <div class="hint">Bookmarklet (one line, cache-busting):</div>
-    <pre id="bmText" readonly style="user-select:all">
-javascript:(function(){var s=document.createElement('script');s.src='https://gist.githubusercontent.com/KAOS-CODM/5b9017246f869e3b0ccf5fa5ab55a641/raw/24b7776d40bc893c11a6133e8f51958b500c5175/inactive-users-v37.user.js?'+Date.now();document.body.appendChild(s);})();</pre>
-
-    <h3>3) Mobile install notes</h3>
-    <p><strong>iOS Safari</strong> — create any bookmark, then edit it: replace the URL with the bookmarklet string above. Save it to your bookmarks bar or Home Screen for quick access.</p>
-    <p><strong>Android Chrome</strong> — save any page as a bookmark, then edit that bookmark and paste the bookmarklet into the URL field. Firefox for Android also allows editing bookmark URLs.</p>
-    <p class="hint">If your mobile browser strips `javascript:` in the bookmark URL field, try using Firefox Mobile or the Kiwi Browser (both support custom JS bookmarklets).</p>
-
-    <h3>4) Quick troubleshooting</h3>
-    <ul>
-      <li>If tapping the bookmarklet does nothing, open Developer Console (desktop) or try Firefox/Kiwi (mobile).</li>
-      <li>Make sure you are on the Cartel Empire page when you click the bookmark — the script expects the site DOM.</li>
-      <li>Some browsers aggressively block js: bookmarklets from pages that were loaded over HTTPS with strict CSP — the raw-gist loader with Date.now() is the recommended approach.</li>
-    </ul>
-
-    <footer>
-      Tip: when you update the script on the gist, the bookmarklet will fetch the latest raw file thanks to the `?Date.now()` cache-buster.
-    </footer>
-  </div>
+<body style="background:#111;color:#eee;font-family:monospace;padding:20px;">
+  <h1>Cartel Empire - Inactive User Tool</h1>
+  <p>Click below to launch the tool in Cartel Empire:</p>
+  <button id="launch" style="padding:10px 20px;background:#4caf50;color:#fff;border:none;border-radius:5px;cursor:pointer;">
+    Open Inactive Users Tool
+  </button>
 
   <script>
-    (function(){
-      const raw = "https://gist.githubusercontent.com/KAOS-CODM/5b9017246f869e3b0ccf5fa5ab55a641/raw/24b7776d40bc893c11a6133e8f51958b500c5175/inactive-users-v37.user.js";
-      const bookmarklet = "javascript:(function(){var s=document.createElement('script');s.src='"+raw+"?'+Date.now();document.body.appendChild(s);})();";
-
-      const copyBtn = document.getElementById("copyBtn");
-      const bmText = document.getElementById("bmText");
-      const runBtn = document.getElementById("runBtn");
-
-      // show bookmarklet text
-      bmText.textContent = bookmarklet;
-
-      copyBtn.addEventListener("click", async () => {
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(bookmarklet);
-            copyBtn.textContent = "Copied ✓";
-            setTimeout(()=>copyBtn.textContent="Copy bookmarklet",1500);
-          } else {
-            // fallback: select text
-            const ta = document.createElement("textarea");
-            ta.value = bookmarklet;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand("copy");
-            ta.remove();
-            copyBtn.textContent = "Copied ✓";
-            setTimeout(()=>copyBtn.textContent="Copy bookmarklet",1500);
-          }
-        } catch (err) {
-          alert("Copy failed — please long-press/select the text and copy manually.");
-        }
-      });
-
-      // "Run now" button: injects the script into the current page (only works if this page is open in the same tab as Cartel site)
-      runBtn.addEventListener("click", () => {
-        // attempt to inject into the current document (this page). This is mostly useful for testing if you open this page in the Cartel domain.
-        const s = document.createElement("script");
-        s.src = raw + "?" + Date.now();
-        document.body.appendChild(s);
-        runBtn.textContent = "Injected ✓";
-        setTimeout(()=>runBtn.textContent="Run now (current tab)",1500);
-      });
-
-      // Make dragLink show a small tooltip on touch devices
-      const dragLink = document.getElementById("dragLink");
-      dragLink.addEventListener("click", (e)=>{
-        // prevent executing javascript: when clicking on mobile (since many mobiles don't support it)
-        if (/Mobi|Android/i.test(navigator.userAgent)) {
-          e.preventDefault();
-          alert("On mobile create a bookmark then edit its URL with the copied bookmarklet (use the Copy bookmarklet button).");
-        }
-      });
-    })();
+    document.getElementById("launch").addEventListener("click", function(){
+      var w = window.open("https://cartelempire.online/Cartel", "_blank");
+      var scriptUrl = "https://gist.githubusercontent.com/KAOS-CODM/5b9017246f869e3b0ccf5fa5ab55a641/raw/24b7776d40bc893c11a6133e8f51958b500c5175/inactive-users-v37.user.js";
+      w.onload = function() {
+        var s = w.document.createElement("script");
+        s.src = scriptUrl + "?_=" + Date.now(); // cache-bust
+        w.document.body.appendChild(s);
+      };
+    });
   </script>
 </body>
 </html>
